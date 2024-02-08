@@ -307,7 +307,7 @@ def Start(API, sw_list,Cisco_SW_config,webex_email):
 
     ## Extract out the details of the switch module and the port number
     def check(intf):
-        parse = CiscoConfParse(Cisco_SW_config, syntax='ios', factory=True)
+        parse = CiscoConfParse(Cisco_SW_config, syntax='nxos', factory=True)
 
         intf_rgx = re.compile(r'interface GigabitEthernet(\d+)\/(\d+)\/(\d+)$')
 
@@ -322,7 +322,7 @@ def Start(API, sw_list,Cisco_SW_config,webex_email):
     def read_Cisco_SW():
         ##Parsing the Cisco Catalyst configuration (focused on the interface config)
         print("-------- Reading <"+Cisco_SW_config+"> Configuration --------")
-        parse = CiscoConfParse(Cisco_SW_config, syntax='ios', factory=True)
+        parse = CiscoConfParse(Cisco_SW_config, syntax='nxos', factory=True)
 
         x = 0
         Gig_uplink=[]

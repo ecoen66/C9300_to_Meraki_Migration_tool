@@ -5,7 +5,7 @@ from collections import defaultdict
 from flask_session import Session
 
 Bot_Bearer = usr_info.Bot_Bearer
-base_url = "https://api.meraki.com/api/v0/"
+base_url = "https://api.meraki.com/api/v1/"
 webex_url = "https://api.ciscospark.com/v1/messages"
 
 payload = {}
@@ -47,7 +47,7 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
                     "Accept": "application/json",
                     "X-Cisco-Meraki-API-Key": api
                     }
-        url = "https://api.meraki.com/api/v0/devices/"+serial+"/switchPorts/"+str(p_number)
+        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switchPorts/"+str(p_number)
 
         payload = '''{
             "name": "%s",
@@ -79,7 +79,7 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
                     "Accept": "application/json",
                     "X-Cisco-Meraki-API-Key": api
                     }
-        url = "https://api.meraki.com/api/v0/devices/"+serial+"/switchPorts/"+str(p_number)
+        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switchPorts/"+str(p_number)
 
         payload = '''{
             "name": "%s",
@@ -111,7 +111,7 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
                     "Accept": "application/json",
                     "X-Cisco-Meraki-API-Key": api
                     }
-        url = "https://api.meraki.com/api/v0/devices/"+serial+"/switchPorts/"+str(p_number)
+        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switchPorts/"+str(p_number)
 
         payload = '''{
             "name": "%s",
@@ -143,7 +143,7 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
                     "Accept": "application/json",
                     "X-Cisco-Meraki-API-Key": api
                     }
-        url = "https://api.meraki.com/api/v0/devices/"+serial+"/switchPorts/"+str(p_number)
+        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switchPorts/"+str(p_number)
 
         payload = '''{
             "enabled": false

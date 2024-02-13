@@ -1,6 +1,6 @@
 # Cisco Catalyst to Meraki MS Migration tool
 
-This tool built to migrate Cisco Catalyst configuration of WC-29xx models to Meraki Switching line (MS). Currently, the tool is only covering the downlinks.  
+This tool was built to migrate Cisco IOSXE configuration of C9200/C9300 models to Meraki Switching line (MS). Currently, the tool is only covering the downlinks.  
 
 Below is the list of configurations the tool can read and migrate:
 - Switch stack configuration (up to 8 switches)
@@ -19,7 +19,7 @@ After the configuration pushed to Meraki dashboard, the script will send a Webex
 
 ![High Level Design](static/Cat2MS_Migration_tool.png)
 
-Once the python script is running, the below UI will be accessable to enter the required details to migrating the Catalyst configuration to Meraki MS. 
+Once the python script is running, the below UI will be accessible to enter the required details to migrating the Catalyst configuration to Meraki MS. 
 
 ![](static/Migration_tool_UI.png)
 

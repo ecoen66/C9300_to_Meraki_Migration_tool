@@ -1,4 +1,4 @@
-from ciscoconfparse import CiscoConfParse
+from ciscoconfparse2 import CiscoConfParse
 from flask import Flask, render_template, request, redirect, url_for, session
 import os, requests, json, pprint, re, usr_info
 from collections import defaultdict
@@ -47,11 +47,11 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
                     "Accept": "application/json",
                     "X-Cisco-Meraki-API-Key": api
                     }
-        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switchPorts/"+str(p_number)
+        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switch/ports/"+str(p_number)
 
         payload = '''{
             "name": "%s",
-            "tags": "",
+            "tags": [],
             "enabled": %s,
             "poeEnabled": true,
             "type": "%s",
@@ -61,8 +61,8 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
             "rstpEnabled": true,
             "stpGuard": "disabled",
             "linkNegotiation": "Auto negotiate",
-            "stickyMacWhitelist": %s,
-            "stickyMacWhitelistLimit": %s
+            "stickyMacAllowlist": %s,
+            "stickyMacAllowlistLimit": %s
             }'''% (desc,active,mode,data_Vlan,voice_Vlan,mac,mac_limit)
         print(payload)
         response = requests.request('PUT', url, headers=headers, data = payload)
@@ -79,11 +79,11 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
                     "Accept": "application/json",
                     "X-Cisco-Meraki-API-Key": api
                     }
-        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switchPorts/"+str(p_number)
+        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switch/ports/"+str(p_number)
 
         payload = '''{
             "name": "%s",
-            "tags": "",
+            "tags": [],
             "enabled": %s,
             "poeEnabled": true,
             "type": "%s",
@@ -92,9 +92,9 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
             "isolationEnabled": false,
             "rstpEnabled": true,
             "stpGuard": "disabled",
-            "linkNegotiation": "Auto negotiate",
-            "accessPolicyNumber": null
+            "linkNegotiation": "Auto negotiate"
             }'''% (desc,active,mode,data_Vlan,voice_Vlan)
+        print(url)
         print(payload)
         response = requests.request('PUT', url, headers=headers, data = payload)
 
@@ -111,11 +111,11 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
                     "Accept": "application/json",
                     "X-Cisco-Meraki-API-Key": api
                     }
-        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switchPorts/"+str(p_number)
+        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switch/ports/"+str(p_number)
 
         payload = '''{
             "name": "%s",
-            "tags": "",
+            "tags": [],
             "enabled": %s,
             "poeEnabled": true,
             "type": "%s",
@@ -143,7 +143,7 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
                     "Accept": "application/json",
                     "X-Cisco-Meraki-API-Key": api
                     }
-        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switchPorts/"+str(p_number)
+        url = "https://api.meraki.com/api/v1/devices/"+serial+"/switch/ports/"+str(p_number)
 
         payload = '''{
             "enabled": false
@@ -307,29 +307,33 @@ def Start(API, sw_list,Cisco_SW_config,webex_email):
 
     ## Extract out the details of the switch module and the port number
     def check(intf):
-        parse = CiscoConfParse(Cisco_SW_config, syntax='nxos', factory=True)
+        parse = CiscoConfParse(Cisco_SW_config, syntax='ios', factory=True)
 
         intf_rgx = re.compile(r'interface GigabitEthernet(\d+)\/(\d+)\/(\d+)$')
 
         for obj in parse.find_objects(intf):
             Sub_module = None
-            port = obj.ordinal_list[-1]
+            port = obj.ordinal_list[2]
             if intf_rgx.search(obj.text) is not None:
-                Sub_module = obj.ordinal_list[-2]
+                Sub_module = obj.ordinal_list[1]
 
             return port,Sub_module
 
     def read_Cisco_SW():
         ##Parsing the Cisco Catalyst configuration (focused on the interface config)
         print("-------- Reading <"+Cisco_SW_config+"> Configuration --------")
-        parse = CiscoConfParse(Cisco_SW_config, syntax='nxos', factory=True)
+        parse = CiscoConfParse(Cisco_SW_config, syntax='ios', factory=True)
 
         x = 0
         Gig_uplink=[]
         All_interfaces= defaultdict(list)
         ## Select the interfaces
         intf = parse.find_objects('^interface')
-        for intf_obj in parse.find_objects_w_child('^interface', '^\s+shutdown'):
+        ## Remove the management interface from the interface list
+        intf[:] = [x for x in intf if not (x.re_match_typed('^interface\s+(\S.*)$') == "GigabitEthernet0/0" or x.re_match_typed('^interface\s+(\S.*)$').startswith("Loopback") or x.re_match_typed('^interface\s+(\S.*)$').startswith("Vlan"))]
+
+##        print(f"intf= {intf}")
+        for intf_obj in parse.find_parent_objects([r'^interface', r'^\s+shutdown']):
             shut_interfaces.append(intf_obj.re_match_typed('^interface\s+(\S.+?)$'))
         #print(f"These are the shut interfaces: {shut_interfaces}")
 
@@ -339,7 +343,7 @@ def Start(API, sw_list,Cisco_SW_config,webex_email):
             #Only interface name will be used to catogrize different types of interfaces (downlink and uplink)
             only_intf_name = re.sub("\d+|\\/","",intf_name)
             Switch_module = intf_obj.re_match_typed('^interface\s\S+?thernet+(\d)')
-            test_port_numerb = intf_obj.re_match_typed('^interface\s\S+?thernet+(\S+?)')
+            test_port_number = intf_obj.re_match_typed('^interface\s\S+?thernet+(\S+?)')
 
             All_interfaces[only_intf_name].append(intf_name)
 
@@ -434,7 +438,7 @@ def confirm():
     sw_list = session["sw_list"]
     #Start the meraki config migration after confirmation from the user
     Meraki_config(api,sw_list,data,Downlink_list)
-####Check the return from thr Meraki_config function and make it part of the session
+####Check the return from the Meraki_config function and make it part of the session
     return render_template("Success.html", configured_ports=configured_ports, unconfigured_ports=unconfigured_ports)
 
 @app.route('/api', methods=["POST"])

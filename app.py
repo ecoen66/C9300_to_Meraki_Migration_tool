@@ -22,17 +22,18 @@ sw_list = []
 configured_ports = defaultdict(list)
 unconfigured_ports = defaultdict(list)
 
-def Meraki_config(api,sw_list,my_dict,Downlink_list):
+def Meraki_config(api,sw_list,my_dict,Downlink_list,hostname):
     #Webex teams Payload
-    def Webex_payload(success,failed):
+    def Webex_payload(success,failed,hostname):
         payload =""
-        payload ='''
+        payload = '''
+For the Catalyst switch %s:
 \u2713 Ports that configured successfully
 %s
 \u2717 Ports that failed to be configured
 %s
 ----------------------------------------------------------
-'''%(str(success),str(failed))
+'''%(hostname,str(dict(success)),str(dict(failed)))
         return payload
 
     def Webex_Teams(message,To_email):
@@ -40,6 +41,25 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
         headers = {"Content-type":"application/json", "Authorization": "Bearer " + Bot_Bearer}
         response = requests.post(url=webex_url, json=body, headers=headers)
         print(response.text)
+
+    def config_hostname(serial,hostname):
+        headers = {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "X-Cisco-Meraki-API-Key": api
+                    }
+        url = "https://api.meraki.com/api/v1/devices/"+serial
+
+        payload = '''{
+            "name": "%s",
+            "notes": "This was a conversion from a Catalyst IOSXE config."
+            }'''% (hostname)
+        print(payload)
+        response = requests.request('PUT', url, headers=headers, data = payload)
+        if response.status_code == 200:
+            print(json.loads(response.text))
+        else:
+            print(response.status_code)
 
     def config_access_port(serial,p_number,desc,active,mode,data_Vlan,voice_Vlan,mac,mac_limit):
         headers = {
@@ -158,10 +178,13 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
             unconfigured_ports[serial].append(p_number)
 
     ## Loop to go through all the ports of the switches
-    def loop_configure_meraki(my_dict,Downlink_list):
+    def loop_configure_meraki(my_dict,Downlink_list,hostname):
+        ## Configure the hostname in the my_dict
+        if not hostname == "":
+            config_hostname(sw_list[0], hostname)
         try:
             y = 0
-            #Loop to get all the interfaces in the my_dict
+            ## Loop to get all the interfaces in the my_dict
             while y <= len(Downlink_list)-1:
                 x = Downlink_list[y]
                 print("\n----------- "+x+" -----------")
@@ -244,9 +267,10 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
             print("Can't find port " + str(y))
             pass
 
-    loop_configure_meraki(my_dict,Downlink_list)
+    loop_configure_meraki(my_dict,Downlink_list,hostname)
+    print(configured_ports)
     try:
-        Webex_Teams(Webex_payload(configured_ports,unconfigured_ports),session["webex_email"])
+        Webex_Teams(Webex_payload(configured_ports,unconfigured_ports,hostname),session["webex_email"])
     except:
         print(f"Couldn't send message to Webex Teams")
 
@@ -322,13 +346,18 @@ def Start(API, sw_list,Cisco_SW_config,webex_email):
         ##Parsing the Cisco Catalyst configuration (focused on the interface config)
         print("-------- Reading <"+Cisco_SW_config+"> Configuration --------")
         parse = CiscoConfParse(Cisco_SW_config, syntax='ios', factory=True)
+        
+        hostname = ""
+        hostname_obj = parse.find_objects('^hostname')
+        if not hostname_obj == []:
+          hostname = hostname_obj[0].re_match_typed('^hostname\s(\S+)')
 
         x = 0
         Gig_uplink=[]
         All_interfaces= defaultdict(list)
         ## Select the interfaces
         intf = parse.find_objects('^interface')
-        ## Remove the management interface from the interface list
+        ## Remove the management, Loopback and VLAN interfaces from the interface list
         intf[:] = [x for x in intf if not (x.re_match_typed('^interface\s+(\S.*)$') == "GigabitEthernet0/0" or x.re_match_typed('^interface\s+(\S.*)$').startswith("Loopback") or x.re_match_typed('^interface\s+(\S.*)$').startswith("Vlan"))]
 
 ##        print(f"intf= {intf}")
@@ -419,10 +448,10 @@ def Start(API, sw_list,Cisco_SW_config,webex_email):
                 print(f"Error in ready interface {intf_name}")
 
         Uplink_list, Downlink_list, Other_list = split_down_up_link(All_interfaces,Gig_uplink)
-        return Uplink_list, Downlink_list, Other_list, my_dict
+        return Uplink_list, Downlink_list, Other_list, my_dict, hostname
 
-    Uplink_list, Downlink_list, Other_list, my_dict = read_Cisco_SW()
-    return Uplink_list, Downlink_list, Other_list,my_dict
+    Uplink_list, Downlink_list, Other_list, my_dict, hostname  = read_Cisco_SW()
+    return Uplink_list, Downlink_list, Other_list, my_dict, hostname
 
 @app.route('/')
 def index():
@@ -435,8 +464,10 @@ def confirm():
     Downlink_list = session["Downlink_list"]
     api = session["api"]
     sw_list = session["sw_list"]
-    #Start the meraki config migration after confirmation from the user
-    Meraki_config(api,sw_list,data,Downlink_list)
+    my_dict = session["my_dict"]
+    hostname = session["hostname"]
+   #Start the meraki config migration after confirmation from the user
+    Meraki_config(api,sw_list,data,Downlink_list,hostname)
 ####Check the return from the Meraki_config function and make it part of the session
     return render_template("Success.html", configured_ports=configured_ports, unconfigured_ports=unconfigured_ports)
 
@@ -468,7 +499,7 @@ def api():
     webex_email = session["webex_email"]
     sw_file = session["sw_file"]
 
-    session["Uplink_list"], session["Downlink_list"], session["Other_list"], session["my_dict"] = Start(api,session["sw_list"],sw_file,webex_email)
+    session["Uplink_list"], session["Downlink_list"], session["Other_list"], session["my_dict"], session["hostname"] = Start(api,session["sw_list"],sw_file,webex_email)
 
     #Creating a list to select the configuration parts to push to Meraki
     ToBeConfigured = {}

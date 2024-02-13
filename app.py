@@ -94,7 +94,6 @@ def Meraki_config(api,sw_list,my_dict,Downlink_list):
             "stpGuard": "disabled",
             "linkNegotiation": "Auto negotiate"
             }'''% (desc,active,mode,data_Vlan,voice_Vlan)
-        print(url)
         print(payload)
         response = requests.request('PUT', url, headers=headers, data = payload)
 
